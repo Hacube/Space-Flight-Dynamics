@@ -2,10 +2,11 @@
 % Jacob Amezquita
 % Ryan Pettigrew
 
+clc; close all; clear;
+
 %Constants
 RE = 6378;       %km, radius Earth
-muE = 398600;    %km^3/s^2, Mu earth
-mE = 5.9722e24;  %kg, mass Earth
+mu = 398600;    %km^3/s^2, Mu earth
 
 % S/C A
 ecc_A = 0.0002046; 
@@ -15,23 +16,23 @@ ra_A = 35794 + RE; % km
 raan_A = 79.9111;  % degs 
 omega_A = 98.1606; % degs 
 T_A = 1.00272835;  % rev/day
-ma_A = 210.4111;   % degs, mean anomaly
+theta_A = 210.4111;   % degs, mean anomaly
 
 a_A = (ra_A+rp_A)/2;
-h_A = sqrt(a_A*muE*(1-ecc_A^2));
+h_A = sqrt(a_A*mu*(1-ecc_A^2));
 
 % S/C B
 ecc_B = 0.0002046; 
 inc_B = 0.0921;    % degs
-rp_B = 35777 + RE;      % km 
-ra_B = 35794 + RE;      % km 
+rp_B = 35777 + RE; % km 
+ra_B = 35794 + RE; % km 
 raan_B = 79.9111;  % degs 
 omega_B = 98.1606; % degs 
 T_B = 1.00272835;  % rev/day
-ma_B = 210.4111;   % degs, mean anomaly
+theta_B = 210.4111;   % degs, mean anomaly
 
 a_B = (ra_B+rp_B)/2;
-h_B = sqrt(a_B*muE*(1-ecc_B^2));
+h_B = sqrt(a_B*mu*(1-ecc_B^2));
 
 
 % target parameters
@@ -43,6 +44,54 @@ hECI_A0 = cross(rECI_A,vECI_A); % km2/s
 % chaser parameters
 [~,~,rECI_B,vECI_B] = coes2rv(ecc_B,h_B,inc_B,raan_B,omega_B,theta_B,mu); % km & km/s, chaser r&v
 
+% Step forward (10 periods)
+dt = 1; % s, time step
+TOL = 10e-8; % tolerance for UV
+countMax = 1000; % max iterations for UV
+tf = 10*P_A; % s, final time from start
+n = ceil(tf/dt)+1; % number of time steps
+t = 0; % pre-allocate time variable
+rho = zeros(n,5); % pre-allocate matrix for time and rho
+
+for i = 1:dt:n
+    hECI_A = cross(rECI_A,vECI_A); % km2/s
+    aECI_A = (-mu/norm(rECI_A)^3).*rECI_A; % km/s2
+    aECI_B = (-mu/norm(rECI_B)^3).*rECI_B; % km/s2
+
+    % 5-term acceleration
+    rhoECI = rECI_B - rECI_A; % km, relative positon of chaser
+    Omega = hECI_A/(norm(rECI_A)^2); % absolute angular velocity of moving frame
+    drhoECI = vECI_B - vECI_A - cross(Omega,rhoECI); % km/s
+    dOmega = -2*dot(vECI_A,rECI_A).*Omega ./ norm(rECI_A)^2; % absolute angular acceleration of moving frame
+    ddrhoECI = aECI_B - aECI_A - 2.*cross(Omega,drhoECI) - cross(dOmega,rhoECI) + cross(Omega,cross(Omega,rhoECI)); % km/s2
+    
+    % DCM (ECI to LVLH)
+    ihat = rECI_A / norm(rECI_A);
+    khat = hECI_A / norm(hECI_A);
+    jhat = cross(khat,ihat);
+    Q = [ihat';jhat';khat']; % direction cosine matrix
+
+    % rho in LVLH
+    rhoLVLH = Q*rhoECI;
+    drhoLVLH = Q*drhoECI;
+    ddrhoLVLH = Q*ddrhoECI;
+    
+    % store
+    rho(i,1) = t; % s, time step
+    rho(i,2:4) = rhoLVLH'; % km, relative position vector
+    rho(i,5) = norm(rhoLVLH); % km, relative position magnitude
+    
+    % re-allocate values
+    vECI_A0 = vECI_A;
+    
+    rECI_A0 = rECI_A;
+    vECI_B0 = vECI_B;
+    rECI_B0 = rECI_B;
+    % next step:
+    [rECI_A,vECI_A] = UV_rv(dt, vECI_A0, rECI_A0, mu, TOL, countMax);
+    [rECI_B,vECI_B] = UV_rv(dt, vECI_B0, rECI_B0, mu, TOL, countMax);
+    t = t + dt;
+end
 
 %% Functions
 function [rPeri,vPeri,rECI,vECI] = coes2rv(ecc,h,inc,raan,aop,theta,mu)
