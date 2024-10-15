@@ -24,8 +24,8 @@ h_A = sqrt(a_A*mu*(1-ecc_A^2));
 % S/C B
 ecc_B = 0.0002046; 
 inc_B = 0.0921;    % degs
-rp_B = 35777 + RE; % km 
-ra_B = 35794 + RE; % km 
+rp_B = 35777 + RE -100; % km 
+ra_B = 35794 + RE -100; % km 
 raan_B = 79.9111;  % degs 
 omega_B = 98.1606; % degs 
 T_B = 1.00272835;  % rev/day
@@ -52,6 +52,11 @@ tf = 10*P_A; % s, final time from start
 n = ceil(tf/dt)+1; % number of time steps
 t = 0; % pre-allocate time variable
 rho = zeros(n,5); % pre-allocate matrix for time and rho
+
+% Mission Target Waypoints
+waypt0 = hECI_A0;
+waypt1 = hECI_A0 - [0; 100; 0];
+waypt2
 
 for i = 1:dt:n
     hECI_A = cross(rECI_A,vECI_A); % km2/s
@@ -90,6 +95,8 @@ for i = 1:dt:n
     % next step:
     [rECI_A,vECI_A] = UV_rv(dt, vECI_A0, rECI_A0, mu, TOL, countMax);
     [rECI_B,vECI_B] = UV_rv(dt, vECI_B0, rECI_B0, mu, TOL, countMax);
+
+
     t = t + dt;
 end
 
@@ -250,6 +257,8 @@ function [r,v] = CW_EOM(r0,v0,n,t)
     v = [vx;vy;vz]; % km/s
 end
 
-
-
-
+function [x] = hop(x, y, z)
+n = pi;
+t = 1;
+x = [0; 2*y_dot0/n; - 2*y_dot/n *cos(n*t)];
+end
