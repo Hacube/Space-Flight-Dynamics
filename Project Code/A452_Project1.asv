@@ -24,8 +24,8 @@ h_A = sqrt(a_A*mu*(1-ecc_A^2));
 % S/C B
 ecc_B = 0.0002046; 
 inc_B = 0.0921;    % degs
-rp_B = 35777 + RE -100; % km 
-ra_B = 35794 + RE -100; % km 
+rp_B = 35777 + RE; % km 
+ra_B = 35794 + RE; % km 
 raan_B = 79.9111;  % degs 
 omega_B = 98.1606; % degs 
 T_B = 1.00272835;  % rev/day
@@ -63,15 +63,15 @@ t_Fb= 5;
 wayPoint = [0; waypt0;
             10; 1; 1; 1];
 
+delta_y = 20000;
 
 for i = 1:dt:n
     
-    if i <  wayPoint(1)
-    % inital position / orb
-
-    else if 
-
-    end
+    % if i <  wayPoint(1)
+    %     % inital position / orbit
+    % elseif  i < waypoint(2)
+    %     % first maneuver 
+    % end
 
     hECI_A = cross(rECI_A,vECI_A); % km2/s
     aECI_A = (-mu/norm(rECI_A)^3).*rECI_A; % km/s2
@@ -117,6 +117,36 @@ for i = 1:dt:n
 
     t = t + dt;
 end
+
+% i_close = find(rho(:,5)==min(rho(:,5))); % find index where closest approach occurs
+% rho_mag_close = rho(i_close,5); % km, magnitude of closest approach
+% rho_pos_close = rho(i_close,2:4); % km, relative position of closest approach
+% time_close = rho(i_close,1)/3600; % hr, time from start of closest approach
+% 
+% figure
+% plot(rho(:,1)/3600,rho(:,5),LineWidth=1.5)
+% hold on
+% grid on
+% 
+% figure
+% plot(time_close,rho_mag_close,'*',LineWidth=1.5)
+% legend('Relative Distance','Closest Approach',Location='northeast')
+% title("Close Approach of Chaser to Target")
+% xlabel("Time (hrs)")
+% ylabel("Distance Between S/C (km)")
+% figure(2)
+% plot3(rho(:,2),rho(:,3),rho(:,4),LineWidth=1)
+% hold on
+% grid on
+% 
+% figure
+% plot3(rho_pos_close(1),rho_pos_close(2),rho_pos_close(3),'*',LineWidth=1.5)
+% legend('Chaser Relative Trajectory','Closest Approach',Location='best')
+% %'Target Location',
+% title("Chaser Relative Position")
+% xlabel("x (km)")
+% ylabel("y (km)")
+% zlabel("z (km)")
 
 %% Functions
 function [rPeri,vPeri,rECI,vECI] = coes2rv(ecc,h,inc,raan,aop,theta,mu)
@@ -186,7 +216,6 @@ function [smiley, C, S, alpha] = KeplerUV(dt, v0, r0, mu, TOL, countMax)
     end
 end
 
-% Stumpff Function
 function [C, S] = stumpff(z)
     if z>0
         C = (1-cos(sqrt(z)))/z;
@@ -300,10 +329,11 @@ end
 function [r_f, v_f] = FB_orbit(t_FB,n,r0,v0,delta_y)
     % Football maneuver in CW frame
 
-    % t_FB = time for football maneuver
-    % n = mean motion
-    % y0 = initial position
-    % yf = 
+    % t_FB: time for football maneuver
+    % n: mean motion
+    % delta_y: the relative position
+    % r0: intial target position
+    % v0: initial target velocity
     
     % Required dv
     delta_vx = ((delta_y - r0(2))*n)/(2*(cos(n*t_FB) - 1));
@@ -314,7 +344,7 @@ function [r_f, v_f] = FB_orbit(t_FB,n,r0,v0,delta_y)
 
 end
 
-function Q = ECI2LVLH_DCM(rECI_A, rECI_A)
+function Q = ECI2LVLH_DCM(rECI_A, hECI_A)
     % DCM (ECI to LVLH)
     ihat = rECI_A / norm(rECI_A);
     khat = hECI_A / norm(hECI_A);

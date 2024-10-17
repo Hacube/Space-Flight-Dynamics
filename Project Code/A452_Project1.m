@@ -10,13 +10,13 @@ mu = 398600;    %km^3/s^2, Mu earth
 
 % S/C A
 ecc_A = 0.0002046; 
-inc_A = 0.0921;    % degs
-rp_A = 35777 + RE; % km 
-ra_A = 35794 + RE; % km 
-raan_A = 79.9111;  % degs 
-omega_A = 98.1606; % degs 
-T_A = 1.00272835;  % rev/day
-theta_A = 210.4111;   % degs, mean anomaly
+inc_A = 0.0921;     % degs
+rp_A = 35777 + RE;  % km 
+ra_A = 35794 + RE;  % km 
+raan_A = 79.9111;   % degs 
+omega_A = 98.1606;  % degs 
+T_A = 1.00272835;   % rev/day
+theta_A = 210.4111; % degs, mean anomaly
 
 a_A = (ra_A+rp_A)/2;
 h_A = sqrt(a_A*mu*(1-ecc_A^2));
@@ -24,12 +24,12 @@ h_A = sqrt(a_A*mu*(1-ecc_A^2));
 % S/C B
 ecc_B = 0.0002046; 
 inc_B = 0.0921;    % degs
-rp_B = 35777 + RE -100; % km 
-ra_B = 35794 + RE -100; % km 
+rp_B = ra_A;       % km 
+ra_B = ra_A;       % km 
 raan_B = 79.9111;  % degs 
 omega_B = 98.1606; % degs 
 T_B = 1.00272835;  % rev/day
-theta_B = 210.4111;   % degs, mean anomaly
+theta_B = 210.577; % degs, mean anomaly starting 100 km ahead
 
 a_B = (ra_B+rp_B)/2;
 h_B = sqrt(a_B*mu*(1-ecc_B^2));
@@ -45,13 +45,13 @@ hECI_A0 = cross(rECI_A,vECI_A); % km2/s
 [~,~,rECI_B,vECI_B] = coes2rv(ecc_B,h_B,inc_B,raan_B,omega_B,theta_B,mu); % km & km/s, chaser r&v
 
 % Step forward (10 periods)
-dt = 1; % s, time step
-TOL = 10e-8; % tolerance for UV
-countMax = 1000; % max iterations for UV
-tf = 10*P_A; % s, final time from start
+dt = 1;            % s, time step
+TOL = 10e-8;       % tolerance for UV
+countMax = 1000;   % max iterations for UV
+tf = 10*P_A;       % s, final time from start
 n = ceil(tf/dt)+1; % number of time steps
-t = 0; % pre-allocate time variable
-rho = zeros(n,5); % pre-allocate matrix for time and rho
+t = 0;             % pre-allocate time variable
+rho = zeros(n,5);  % pre-allocate matrix for time and rho
 
 % Mission Target Waypoints
 waypt0 = hECI_A0;
@@ -63,6 +63,7 @@ t_Fb= 5;
 wayPoint = [0; waypt0;
             10; 1; 1; 1];
 
+delta_y = 20000;
 
 for i = 1:dt:n
     
@@ -116,6 +117,36 @@ for i = 1:dt:n
 
     t = t + dt;
 end
+
+% i_close = find(rho(:,5)==min(rho(:,5))); % find index where closest approach occurs
+% rho_mag_close = rho(i_close,5); % km, magnitude of closest approach
+% rho_pos_close = rho(i_close,2:4); % km, relative position of closest approach
+% time_close = rho(i_close,1)/3600; % hr, time from start of closest approach
+% 
+% figure
+% plot(rho(:,1)/3600,rho(:,5),LineWidth=1.5)
+% hold on
+% grid on
+% 
+% figure
+% plot(time_close,rho_mag_close,'*',LineWidth=1.5)
+% legend('Relative Distance','Closest Approach',Location='northeast')
+% title("Close Approach of Chaser to Target")
+% xlabel("Time (hrs)")
+% ylabel("Distance Between S/C (km)")
+% figure(2)
+% plot3(rho(:,2),rho(:,3),rho(:,4),LineWidth=1)
+% hold on
+% grid on
+% 
+% figure
+% plot3(rho_pos_close(1),rho_pos_close(2),rho_pos_close(3),'*',LineWidth=1.5)
+% legend('Chaser Relative Trajectory','Closest Approach',Location='best')
+% %'Target Location',
+% title("Chaser Relative Position")
+% xlabel("x (km)")
+% ylabel("y (km)")
+% zlabel("z (km)")
 
 %% Functions
 function [rPeri,vPeri,rECI,vECI] = coes2rv(ecc,h,inc,raan,aop,theta,mu)
