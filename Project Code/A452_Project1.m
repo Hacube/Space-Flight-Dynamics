@@ -5,8 +5,8 @@
 clc; close all; clear;
 
 %Constants
-RE = 6378;       %km, radius Earth
-mu = 398600;    %km^3/s^2, Mu earth
+RE = 6378;      % km, radius Earth
+mu = 398600;    % km^3/s^2, Mu earth
 
 % S/C A
 ecc_A = 0.0002046; 
@@ -34,7 +34,6 @@ theta_B = 210.4111;   % degs, mean anomaly
 a_B = (ra_B+rp_B)/2;
 h_B = sqrt(a_B*mu*(1-ecc_B^2));
 
-
 % target parameters
 [~,~,rECI_A,vECI_A] = coes2rv(ecc_A,h_A,inc_A,raan_A,omega_A,theta_A,mu); % km & km/s, target r&v
 a_A = h_A^2 / (mu * (1-ecc_A^2)); % km, target semi-major axis
@@ -53,17 +52,28 @@ n = ceil(tf/dt)+1; % number of time steps
 t = 0; % pre-allocate time variable
 rho = zeros(n,5); % pre-allocate matrix for time and rho
 
+% Mission timeline
+total_time = 10*24 *3600; % 10 day mission in seconds
+current_time = 0;
+
 % Mission Target Waypoints
 waypt0 = hECI_A0;
 waypt1 = hECI_A0 - [0; 100; 0];
-% waypt2
+
 t_hop = 2;
 t_Fb= 5;
+
+% Waypoints in LVLH frame
+waypoints = [-20, 0, 0;  % 20 km
+             -1, 0, 0;   % 1 km
+             -0.3, 0, 0; % 300 m
+             -0.02, 0, 0]; % 20 m
+
 % [time, x, y,z];
 wayPoint = [0; waypt0;
             10; 1; 1; 1];
 
-
+figure; hold on;
 for i = 1:dt:n
     
     % if i <  wayPoint(1)
@@ -108,15 +118,22 @@ for i = 1:dt:n
     rECI_B0 = rECI_B;
     
     % next step:
-    [rECI_A,vECI_A] = UV_rv(dt, vECI_A0, rECI_A0, mu, TOL, countMax);
-    [rECI_B,vECI_B] = UV_rv(dt, vECI_B0, rECI_B0, mu, TOL, countMax);
+    [rECI_A, vECI_A] = UV_rv(dt, vECI_A0, rECI_A0, mu, TOL, countMax);
+    [rECI_B, vECI_B] = UV_rv(dt, vECI_B0, rECI_B0, mu, TOL, countMax);
+    
+    % delta_y= rECI_B(2) - 20; %target hop pos is 20 behind target
+
+    delta_y = waypoints(i, 2) - r0_lvlh(2);
+    t_hop = norm(waypoints(i, :) - r0_lvlh') / norm(v0_lvlh); % Estimate time based on current velocity
     
     % hop maneuver
     [r_final, v_final] = hop(rECI_A, vECI_A, n, t_hop, delta_y);
 
     t = t + dt;
+    
+    plot(t, rECI_B)
 end
-
+hold off;
 %% Functions
 function [rPeri,vPeri,rECI,vECI] = coes2rv(ecc,h,inc,raan,aop,theta,mu)
     % ecc = eccentricity
