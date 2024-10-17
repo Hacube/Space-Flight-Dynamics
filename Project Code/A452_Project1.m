@@ -24,8 +24,8 @@ h_A = sqrt(a_A*mu*(1-ecc_A^2));
 % S/C B
 ecc_B = 0.0002046; 
 inc_B = 0.0921;    % degs
-rp_B = 35777 + RE -100; % km 
-ra_B = 35794 + RE -100; % km 
+rp_B = 35777 + RE +100; % km 
+ra_B = 35794 + RE +100; % km 
 raan_B = 79.9111;  % degs 
 omega_B = 98.1606; % degs 
 T_B = 1.00272835;  % rev/day
@@ -69,11 +69,6 @@ waypoints = [-20, 0, 0;  % 20 km
              -0.3, 0, 0; % 300 m
              -0.02, 0, 0]; % 20 m
 
-% [time, x, y,z];
-wayPoint = [0; waypt0;
-            10; 1; 1; 1];
-
-figure; hold on;
 for i = 1:dt:n
     
     % if i <  wayPoint(1)
@@ -121,19 +116,15 @@ for i = 1:dt:n
     [rECI_A, vECI_A] = UV_rv(dt, vECI_A0, rECI_A0, mu, TOL, countMax);
     [rECI_B, vECI_B] = UV_rv(dt, vECI_B0, rECI_B0, mu, TOL, countMax);
     
-    % delta_y= rECI_B(2) - 20; %target hop pos is 20 behind target
-
-    delta_y = waypoints(i, 2) - r0_lvlh(2);
-    t_hop = norm(waypoints(i, :) - r0_lvlh') / norm(v0_lvlh); % Estimate time based on current velocity
-    
     % hop maneuver
+    delta_y = waypoints(2, 2) - rECI_B(2); %should be in LVLH to match waypt
+    t_hop = norm(waypoints(2, :) - rECI_B') / norm(vECI_B); % estimate hop time
     [r_final, v_final] = hop(rECI_A, vECI_A, n, t_hop, delta_y);
 
     t = t + dt;
-    
-    plot(t, rECI_B)
+
 end
-hold off;
+
 %% Functions
 function [rPeri,vPeri,rECI,vECI] = coes2rv(ecc,h,inc,raan,aop,theta,mu)
     % ecc = eccentricity
