@@ -313,7 +313,7 @@ function [r_f, v_f] = FB_orbit(t_FB,n,r0,v0,delta_y)
 
 end
 
-function Q = ECI2LVLH_DCM(rECI_A, rECI_A)
+function Q = ECI2LVLH_DCM(rECI_A, hECI_A)
     % DCM (ECI to LVLH)
     ihat = rECI_A / norm(rECI_A);
     khat = hECI_A / norm(hECI_A);
