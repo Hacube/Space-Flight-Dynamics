@@ -5,7 +5,7 @@
 clc; close all; clear;
 
 %Constants
-RE = 6378;       %km, radius Earth
+RE = 6378;      %km, radius Earth
 mu = 398600;    %km^3/s^2, Mu earth
 
 % S/C A
@@ -18,8 +18,8 @@ omega_A = 98.1606;  % degs
 T_A = 1.00272835;   % rev/day
 theta_A = 210.4111; % degs, mean anomaly
 
-a_A = (ra_A+rp_A)/2;
-h_A = sqrt(a_A*mu*(1-ecc_A^2));
+a_A = (ra_A+rp_A)/2;            % km
+h_A = sqrt(a_A*mu*(1-ecc_A^2)); % km^2/s
 
 % S/C B
 ecc_B = 0.0002046; 
@@ -31,15 +31,17 @@ omega_B = 98.1606; % degs
 T_B = 1.00272835;  % rev/day
 theta_B = 210.577; % degs, mean anomaly starting 100 km ahead
 
-a_B = (ra_B+rp_B)/2;
-h_B = sqrt(a_B*mu*(1-ecc_B^2));
+a_B = (ra_B+rp_B)/2;            % km
+h_B = sqrt(a_B*mu*(1-ecc_B^2)); % km^2/s
 
+% mean motion
+n = sqrt(mu/a_A^3);  % rad/s
 
 % target parameters
 [~,~,rECI_A,vECI_A] = coes2rv(ecc_A,h_A,inc_A,raan_A,omega_A,theta_A,mu); % km & km/s, target r&v
 a_A = h_A^2 / (mu * (1-ecc_A^2)); % km, target semi-major axis
-P_A = 2*pi*a_A^(3/2) / sqrt(mu); % s, target period
-hECI_A0 = cross(rECI_A,vECI_A); % km2/s
+P_A = 2*pi*a_A^(3/2) / sqrt(mu);  % s, target period
+hECI_A0 = cross(rECI_A,vECI_A);   % km2/s
 
 % chaser parameters
 [~,~,rECI_B,vECI_B] = coes2rv(ecc_B,h_B,inc_B,raan_B,omega_B,theta_B,mu); % km & km/s, chaser r&v
@@ -49,11 +51,11 @@ dt = 1;            % s, time step
 TOL = 10e-8;       % tolerance for UV
 countMax = 1000;   % max iterations for UV
 tf = 10*P_A;       % s, final time from start
-n = ceil(tf/dt)+1; % number of time steps
+num = ceil(tf/dt)+1; % number of time steps
 t = 0;             % pre-allocate time variable
-rho = zeros(n,5);  % pre-allocate matrix for time and rho
+rho = zeros(num,5);  % pre-allocate matrix for time and rho
 
-hops = zeros(n,7);  % pre-allocate matrix for time and hop
+hops = zeros(num,7);  % pre-allocate matrix for time and hop
 
 % Mission Target Waypoints
 waypt0 = hECI_A0;
@@ -67,7 +69,7 @@ wayPoint = [0; waypt0;
 
 delta_y = 20000;
 
-for i = 1:dt:n
+for i = 1:dt:num
     
     % if i <  wayPoint(1)
     %     % inital position / orbit
@@ -114,9 +116,21 @@ for i = 1:dt:n
     [rECI_A,vECI_A] = UV_rv(dt, vECI_A0, rECI_A0, mu, TOL, countMax);
     [rECI_B,vECI_B] = UV_rv(dt, vECI_B0, rECI_B0, mu, TOL, countMax);
     
+    % % hop maneuver
+    % [r_final, v_final] = hop(rECI_A, vECI_A, n, t_hop, delta_y);
+    % 
+    % % store hops
+    % hops(i,1) = t; % s, time step
+    % hops(i,2:4) = r_final';
+    % hops(i,5:7) = v_final';
+
+    t = t + dt;
+end
+
+for i = 1:dt:num
     % hop maneuver
     [r_final, v_final] = hop(rECI_A, vECI_A, n, t_hop, delta_y);
-
+    
     % store hops
     hops(i,1) = t; % s, time step
     hops(i,2:4) = r_final';
@@ -124,7 +138,6 @@ for i = 1:dt:n
 
     t = t + dt;
 end
-
 
 %% Functions
 function [rPeri,vPeri,rECI,vECI] = coes2rv(ecc,h,inc,raan,aop,theta,mu)
@@ -304,7 +317,7 @@ function [r_f, v_f] = hop(r0, v0, n, t_hop, delta_y)
     [r_f, v_f] = CW_EOM(r0, v0_new, n, t_hop); %returns final [pos, vel]
 end
 
-function [r_f, v_f] = FB_orbit(t_FB,n,r0,v0,delta_y)
+function [r_f, v_f] = FB_orbit(r0,v0,n,t_FB,delta_y)
     % Football maneuver in CW frame
 
     % t_FB: time for football maneuver
