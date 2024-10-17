@@ -24,8 +24,8 @@ h_A = sqrt(a_A*mu*(1-ecc_A^2));
 % S/C B
 ecc_B = 0.0002046; 
 inc_B = 0.0921;    % degs
-rp_B = 35777 + RE; % km 
-ra_B = 35794 + RE; % km 
+rp_B = 35777 - 100 + RE; % km 
+ra_B = 35794 - 100 + RE; % km 
 raan_B = 79.9111;  % degs 
 omega_B = 98.1606; % degs 
 T_B = 1.00272835;  % rev/day
@@ -33,7 +33,6 @@ theta_B = 210.4111;   % degs, mean anomaly
 
 a_B = (ra_B+rp_B)/2;
 h_B = sqrt(a_B*mu*(1-ecc_B^2));
-
 
 % target parameters
 [~,~,rECI_A,vECI_A] = coes2rv(ecc_A,h_A,inc_A,raan_A,omega_A,theta_A,mu); % km & km/s, target r&v
@@ -45,23 +44,23 @@ hECI_A0 = cross(rECI_A,vECI_A); % km2/s
 [~,~,rECI_B,vECI_B] = coes2rv(ecc_B,h_B,inc_B,raan_B,omega_B,theta_B,mu); % km & km/s, chaser r&v
 
 % Step forward (10 periods)
-dt = 1; % s, time step
-TOL = 10e-8; % tolerance for UV
-countMax = 1000; % max iterations for UV
-tf = 10*P_A; % s, final time from start
+dt = 1;            % s, time step
+TOL = 10e-8;       % tolerance for UV
+countMax = 1000;   % max iterations for UV
+tf = 10*P_A;       % s, final time from start
 n = ceil(tf/dt)+1; % number of time steps
-t = 0; % pre-allocate time variable
-rho = zeros(n,5); % pre-allocate matrix for time and rho
+t = 0;             % pre-allocate time variable
+rho = zeros(n,5);  % pre-allocate matrix for time and rho
 
 for i = 1:dt:n
-    hECI_A = cross(rECI_A,vECI_A); % km2/s
+    hECI_A = cross(rECI_A,vECI_A);         % km2/s
     aECI_A = (-mu/norm(rECI_A)^3).*rECI_A; % km/s2
     aECI_B = (-mu/norm(rECI_B)^3).*rECI_B; % km/s2
 
     % 5-term acceleration
-    rhoECI = rECI_B - rECI_A; % km, relative positon of chaser
-    Omega = hECI_A/(norm(rECI_A)^2); % absolute angular velocity of moving frame
-    drhoECI = vECI_B - vECI_A - cross(Omega,rhoECI); % km/s
+    rhoECI = rECI_B - rECI_A;                                % km, relative positon of chaser
+    Omega = hECI_A/(norm(rECI_A)^2);                         % absolute angular velocity of moving frame
+    drhoECI = vECI_B - vECI_A - cross(Omega,rhoECI);         % km/s
     dOmega = -2*dot(vECI_A,rECI_A).*Omega ./ norm(rECI_A)^2; % absolute angular acceleration of moving frame
     ddrhoECI = aECI_B - aECI_A - 2.*cross(Omega,drhoECI) - cross(dOmega,rhoECI) + cross(Omega,cross(Omega,rhoECI)); % km/s2
     
@@ -77,8 +76,8 @@ for i = 1:dt:n
     ddrhoLVLH = Q*ddrhoECI;
     
     % store
-    rho(i,1) = t; % s, time step
-    rho(i,2:4) = rhoLVLH'; % km, relative position vector
+    rho(i,1) = t;             % s, time step
+    rho(i,2:4) = rhoLVLH';    % km, relative position vector
     rho(i,5) = norm(rhoLVLH); % km, relative position magnitude
     
     % re-allocate values
@@ -93,7 +92,27 @@ for i = 1:dt:n
     t = t + dt;
 end
 
+i_close = find(rho(:,5)==min(rho(:,5))); % find index where closest approach occurs
+rho_mag_close = rho(i_close,5);          % km, magnitude of closest approach
+rho_pos_close = rho(i_close,2:4);        % km, relative position of closest approach
+time_close = rho(i_close,1)/3600;        % hr, time from start of closest approach
+
+
+
 %% Functions
+function [Vx] = FB_orbit(t_FB,n,y0,yf)
+    % t_FB = time for football maneuver
+    % n = mean motion
+    % y0 = initial position
+    % yf = position after football
+    
+    Vx = ((yf - y0)*n)/(2*(cos(n*t_FB) - 1));
+    Vy = 0;
+    
+    [r,v] = CW_EOM(r0,v0,n,t)
+
+end
+
 function [rPeri,vPeri,rECI,vECI] = coes2rv(ecc,h,inc,raan,aop,theta,mu)
     % ecc = eccentricity
     % r = radius, km
