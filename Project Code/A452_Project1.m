@@ -57,8 +57,21 @@ rho = zeros(n,5); % pre-allocate matrix for time and rho
 waypt0 = hECI_A0;
 waypt1 = hECI_A0 - [0; 100; 0];
 % waypt2
+t_hop = 2;
+t_Fb= 5;
+% [time, x, y,z];
+wayPoint = [0; waypt0;
+            10; 1; 1; 1];
+
 
 for i = 1:dt:n
+    
+    % if i <  wayPoint(1)
+    %     % inital position / orbit
+    % elseif  i < waypoint(2)
+    %     % first maneuver 
+    % end
+
     hECI_A = cross(rECI_A,vECI_A); % km2/s
     aECI_A = (-mu/norm(rECI_A)^3).*rECI_A; % km/s2
     aECI_B = (-mu/norm(rECI_B)^3).*rECI_B; % km/s2
@@ -71,11 +84,12 @@ for i = 1:dt:n
     ddrhoECI = aECI_B - aECI_A - 2.*cross(Omega,drhoECI) - cross(dOmega,rhoECI) + cross(Omega,cross(Omega,rhoECI)); % km/s2
     
     % DCM (ECI to LVLH)
-    ihat = rECI_A / norm(rECI_A);
-    khat = hECI_A / norm(hECI_A);
-    jhat = cross(khat,ihat);
-    Q = [ihat';jhat';khat']; % direction cosine matrix
-
+    % ihat = rECI_A / norm(rECI_A);
+    % khat = hECI_A / norm(hECI_A);
+    % jhat = cross(khat,ihat);
+    % Q = [ihat';jhat';khat']; % direction cosine matrix
+    Q = ECI2LVLH_DCM(rECI_A, hECI_A); % direction cosine matrix
+    
     % rho in LVLH
     rhoLVLH = Q*rhoECI;
     drhoLVLH = Q*drhoECI;
@@ -295,7 +309,14 @@ function [r_f, v_f] = FB_orbit(t_FB,n,r0,v0,delta_y)
     v0_new = v0 + [delta_vx; 0; 0]; % new inital velocity
 
     % Call CW eqs to propagate
-    [r_f, v_f] = CW_EOM(r0, v0_new, n, t_hop); %returns final [pos, vel]
+    [r_f, v_f] = CW_EOM(r0, v0_new, n, t_FB); %returns final [pos, vel]
 
 end
 
+function Q = ECI2LVLH_DCM(rECI_A, hECI_A)
+    % DCM (ECI to LVLH)
+    ihat = rECI_A / norm(rECI_A);
+    khat = hECI_A / norm(hECI_A);
+    jhat = cross(khat,ihat);
+    Q = [ihat';jhat';khat']; % direction cosine matrix
+end
