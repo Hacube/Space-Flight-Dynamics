@@ -56,7 +56,7 @@ rho = zeros(n,5); % pre-allocate matrix for time and rho
 % Mission Target Waypoints
 waypt0 = hECI_A0;
 waypt1 = hECI_A0 - [0; 100; 0];
-waypt2
+% waypt2
 
 for i = 1:dt:n
     hECI_A = cross(rECI_A,vECI_A); % km2/s
@@ -95,7 +95,9 @@ for i = 1:dt:n
     % next step:
     [rECI_A,vECI_A] = UV_rv(dt, vECI_A0, rECI_A0, mu, TOL, countMax);
     [rECI_B,vECI_B] = UV_rv(dt, vECI_B0, rECI_B0, mu, TOL, countMax);
-
+    
+    % hop maneuver
+    [r_final, v_final] = hop(rECI_A, vECI_A, n, t_hop, delta_y);
 
     t = t + dt;
 end
@@ -257,8 +259,24 @@ function [r,v] = CW_EOM(r0,v0,n,t)
     v = [vx;vy;vz]; % km/s
 end
 
-function [x] = hop(x, y, z)
-n = pi;
-t = 1;
-x = [0; 2*y_dot0/n; - 2*y_dot/n *cos(n*t)];
+function [r_f, v_f] = hop(r0, v0, n, t_hop, delta_y)
+    % HOP maneuver in CW frame
+
+    % Inputs:
+    %   r0: initial pos vector [x; y; z] km
+    %   v0: initial vel vector [vx; vy; vz] km/s
+    %   n: mean motion of target orbit rad/s
+    %   t_hop: Time of the hop maneuver - seconds
+    %   delta_y: Desired change in y-position - km
+    
+    % Outputs:
+    %   r_f: final pos after hop [x; y; z] km
+    %   v_f: final vel after hop [vx; vy; vz] km/s
+
+    % required dv
+    delta_vy = (delta_y - 2*v0(2)/n*(cos(n*t_hop) - 1)) / (4/n*sin(n*t_hop/2)^2);
+    v0_new = v0 + [0; delta_vy; 0]; % new inital velocity
+
+    % call CW eqs to propagate
+    [r_f, v_f] = CW_EOM(r0, v0_new, n, t_hop); %returns final [pos, vel]
 end
