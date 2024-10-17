@@ -24,8 +24,8 @@ h_A = sqrt(a_A*mu*(1-ecc_A^2));
 % S/C B
 ecc_B = 0.0002046; 
 inc_B = 0.0921;    % degs
-rp_B = 35777 - 100 + RE; % km 
-ra_B = 35794 - 100 + RE; % km 
+rp_B = 35777 + RE -100; % km 
+ra_B = 35794 + RE -100; % km 
 raan_B = 79.9111;  % degs 
 omega_B = 98.1606; % degs 
 T_B = 1.00272835;  % rev/day
@@ -33,6 +33,7 @@ theta_B = 210.4111;   % degs, mean anomaly
 
 a_B = (ra_B+rp_B)/2;
 h_B = sqrt(a_B*mu*(1-ecc_B^2));
+
 
 % target parameters
 [~,~,rECI_A,vECI_A] = coes2rv(ecc_A,h_A,inc_A,raan_A,omega_A,theta_A,mu); % km & km/s, target r&v
@@ -44,23 +45,28 @@ hECI_A0 = cross(rECI_A,vECI_A); % km2/s
 [~,~,rECI_B,vECI_B] = coes2rv(ecc_B,h_B,inc_B,raan_B,omega_B,theta_B,mu); % km & km/s, chaser r&v
 
 % Step forward (10 periods)
-dt = 1;            % s, time step
-TOL = 10e-8;       % tolerance for UV
-countMax = 1000;   % max iterations for UV
-tf = 10*P_A;       % s, final time from start
+dt = 1; % s, time step
+TOL = 10e-8; % tolerance for UV
+countMax = 1000; % max iterations for UV
+tf = 10*P_A; % s, final time from start
 n = ceil(tf/dt)+1; % number of time steps
-t = 0;             % pre-allocate time variable
-rho = zeros(n,5);  % pre-allocate matrix for time and rho
+t = 0; % pre-allocate time variable
+rho = zeros(n,5); % pre-allocate matrix for time and rho
+
+% Mission Target Waypoints
+waypt0 = hECI_A0;
+waypt1 = hECI_A0 - [0; 100; 0];
+% waypt2
 
 for i = 1:dt:n
-    hECI_A = cross(rECI_A,vECI_A);         % km2/s
+    hECI_A = cross(rECI_A,vECI_A); % km2/s
     aECI_A = (-mu/norm(rECI_A)^3).*rECI_A; % km/s2
     aECI_B = (-mu/norm(rECI_B)^3).*rECI_B; % km/s2
 
     % 5-term acceleration
-    rhoECI = rECI_B - rECI_A;                                % km, relative positon of chaser
-    Omega = hECI_A/(norm(rECI_A)^2);                         % absolute angular velocity of moving frame
-    drhoECI = vECI_B - vECI_A - cross(Omega,rhoECI);         % km/s
+    rhoECI = rECI_B - rECI_A; % km, relative positon of chaser
+    Omega = hECI_A/(norm(rECI_A)^2); % absolute angular velocity of moving frame
+    drhoECI = vECI_B - vECI_A - cross(Omega,rhoECI); % km/s
     dOmega = -2*dot(vECI_A,rECI_A).*Omega ./ norm(rECI_A)^2; % absolute angular acceleration of moving frame
     ddrhoECI = aECI_B - aECI_A - 2.*cross(Omega,drhoECI) - cross(dOmega,rhoECI) + cross(Omega,cross(Omega,rhoECI)); % km/s2
     
@@ -76,8 +82,8 @@ for i = 1:dt:n
     ddrhoLVLH = Q*ddrhoECI;
     
     % store
-    rho(i,1) = t;             % s, time step
-    rho(i,2:4) = rhoLVLH';    % km, relative position vector
+    rho(i,1) = t; % s, time step
+    rho(i,2:4) = rhoLVLH'; % km, relative position vector
     rho(i,5) = norm(rhoLVLH); % km, relative position magnitude
     
     % re-allocate values
@@ -89,30 +95,14 @@ for i = 1:dt:n
     % next step:
     [rECI_A,vECI_A] = UV_rv(dt, vECI_A0, rECI_A0, mu, TOL, countMax);
     [rECI_B,vECI_B] = UV_rv(dt, vECI_B0, rECI_B0, mu, TOL, countMax);
+    
+    % hop maneuver
+    [r_final, v_final] = hop(rECI_A, vECI_A, n, t_hop, delta_y);
+
     t = t + dt;
 end
 
-i_close = find(rho(:,5)==min(rho(:,5))); % find index where closest approach occurs
-rho_mag_close = rho(i_close,5);          % km, magnitude of closest approach
-rho_pos_close = rho(i_close,2:4);        % km, relative position of closest approach
-time_close = rho(i_close,1)/3600;        % hr, time from start of closest approach
-
-
-
 %% Functions
-function [Vx] = FB_orbit(t_FB,n,y0,yf)
-    % t_FB = time for football maneuver
-    % n = mean motion
-    % y0 = initial position
-    % yf = position after football
-    
-    Vx = ((yf - y0)*n)/(2*(cos(n*t_FB) - 1));
-    Vy = 0;
-    
-    [r,v] = CW_EOM(r0,v0,n,t)
-
-end
-
 function [rPeri,vPeri,rECI,vECI] = coes2rv(ecc,h,inc,raan,aop,theta,mu)
     % ecc = eccentricity
     % r = radius, km
@@ -269,6 +259,24 @@ function [r,v] = CW_EOM(r0,v0,n,t)
     v = [vx;vy;vz]; % km/s
 end
 
+function [r_f, v_f] = hop(r0, v0, n, t_hop, delta_y)
+    % HOP maneuver in CW frame
 
+    % Inputs:
+    %   r0: initial pos vector [x; y; z] km
+    %   v0: initial vel vector [vx; vy; vz] km/s
+    %   n: mean motion of target orbit rad/s
+    %   t_hop: Time of the hop maneuver - seconds
+    %   delta_y: Desired change in y-position - km
+    
+    % Outputs:
+    %   r_f: final pos after hop [x; y; z] km
+    %   v_f: final vel after hop [vx; vy; vz] km/s
 
+    % required dv
+    delta_vy = (delta_y - 2*v0(2)/n*(cos(n*t_hop) - 1)) / (4/n*sin(n*t_hop/2)^2);
+    v0_new = v0 + [0; delta_vy; 0]; % new inital velocity
 
+    % call CW eqs to propagate
+    [r_f, v_f] = CW_EOM(r0, v0_new, n, t_hop); %returns final [pos, vel]
+end
