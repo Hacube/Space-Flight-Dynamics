@@ -92,6 +92,7 @@ for i = 1:dt:n
     rECI_A0 = rECI_A;
     vECI_B0 = vECI_B;
     rECI_B0 = rECI_B;
+    
     % next step:
     [rECI_A,vECI_A] = UV_rv(dt, vECI_A0, rECI_A0, mu, TOL, countMax);
     [rECI_B,vECI_B] = UV_rv(dt, vECI_B0, rECI_B0, mu, TOL, countMax);
@@ -280,3 +281,21 @@ function [r_f, v_f] = hop(r0, v0, n, t_hop, delta_y)
     % call CW eqs to propagate
     [r_f, v_f] = CW_EOM(r0, v0_new, n, t_hop); %returns final [pos, vel]
 end
+
+function [r_f, v_f] = FB_orbit(t_FB,n,r0,v0,delta_y)
+    % Football maneuver in CW frame
+
+    % t_FB = time for football maneuver
+    % n = mean motion
+    % y0 = initial position
+    % yf = 
+    
+    % Required dv
+    delta_vx = ((delta_y - r0(2))*n)/(2*(cos(n*t_FB) - 1));
+    v0_new = v0 + [delta_vx; 0; 0]; % new inital velocity
+
+    % Call CW eqs to propagate
+    [r_f, v_f] = CW_EOM(r0, v0_new, n, t_hop); %returns final [pos, vel]
+
+end
+
