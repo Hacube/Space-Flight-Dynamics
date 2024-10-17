@@ -5,18 +5,18 @@
 clc; close all; clear;
 
 %Constants
-RE = 6378;      % km, radius Earth
-mu = 398600;    % km^3/s^2, Mu earth
+RE = 6378;       %km, radius Earth
+mu = 398600;    %km^3/s^2, Mu earth
 
 % S/C A
 ecc_A = 0.0002046; 
-inc_A = 0.0921;    % degs
-rp_A = 35777 + RE; % km 
-ra_A = 35794 + RE; % km 
-raan_A = 79.9111;  % degs 
-omega_A = 98.1606; % degs 
-T_A = 1.00272835;  % rev/day
-theta_A = 210.4111;   % degs, mean anomaly
+inc_A = 0.0921;     % degs
+rp_A = 35777 + RE;  % km 
+ra_A = 35794 + RE;  % km 
+raan_A = 79.9111;   % degs 
+omega_A = 98.1606;  % degs 
+T_A = 1.00272835;   % rev/day
+theta_A = 210.4111; % degs, mean anomaly
 
 a_A = (ra_A+rp_A)/2;
 h_A = sqrt(a_A*mu*(1-ecc_A^2));
@@ -24,15 +24,16 @@ h_A = sqrt(a_A*mu*(1-ecc_A^2));
 % S/C B
 ecc_B = 0.0002046; 
 inc_B = 0.0921;    % degs
-rp_B = 35777 + RE +100; % km 
-ra_B = 35794 + RE +100; % km 
+rp_B = ra_A;       % km 
+ra_B = ra_A;       % km 
 raan_B = 79.9111;  % degs 
 omega_B = 98.1606; % degs 
 T_B = 1.00272835;  % rev/day
-theta_B = 210.4111;   % degs, mean anomaly
+theta_B = 210.577; % degs, mean anomaly starting 100 km ahead
 
 a_B = (ra_B+rp_B)/2;
 h_B = sqrt(a_B*mu*(1-ecc_B^2));
+
 
 % target parameters
 [~,~,rECI_A,vECI_A] = coes2rv(ecc_A,h_A,inc_A,raan_A,omega_A,theta_A,mu); % km & km/s, target r&v
@@ -44,30 +45,27 @@ hECI_A0 = cross(rECI_A,vECI_A); % km2/s
 [~,~,rECI_B,vECI_B] = coes2rv(ecc_B,h_B,inc_B,raan_B,omega_B,theta_B,mu); % km & km/s, chaser r&v
 
 % Step forward (10 periods)
-dt = 1; % s, time step
-TOL = 10e-8; % tolerance for UV
-countMax = 1000; % max iterations for UV
-tf = 10*P_A; % s, final time from start
+dt = 1;            % s, time step
+TOL = 10e-8;       % tolerance for UV
+countMax = 1000;   % max iterations for UV
+tf = 10*P_A;       % s, final time from start
 n = ceil(tf/dt)+1; % number of time steps
-t = 0; % pre-allocate time variable
-rho = zeros(n,5); % pre-allocate matrix for time and rho
+t = 0;             % pre-allocate time variable
+rho = zeros(n,5);  % pre-allocate matrix for time and rho
 
-% Mission timeline
-total_time = 10*24 *3600; % 10 day mission in seconds
-current_time = 0;
+hops = zeros(n,7);  % pre-allocate matrix for time and hop
 
 % Mission Target Waypoints
 waypt0 = hECI_A0;
 waypt1 = hECI_A0 - [0; 100; 0];
-
+% waypt2
 t_hop = 2;
 t_Fb= 5;
+% [time, x, y,z];
+wayPoint = [0; waypt0;
+            10; 1; 1; 1];
 
-% Waypoints in LVLH frame
-waypoints = [-20, 0, 0;  % 20 km
-             -1, 0, 0;   % 1 km
-             -0.3, 0, 0; % 300 m
-             -0.02, 0, 0]; % 20 m
+delta_y = 20000;
 
 for i = 1:dt:n
     
@@ -113,17 +111,20 @@ for i = 1:dt:n
     rECI_B0 = rECI_B;
     
     % next step:
-    [rECI_A, vECI_A] = UV_rv(dt, vECI_A0, rECI_A0, mu, TOL, countMax);
-    [rECI_B, vECI_B] = UV_rv(dt, vECI_B0, rECI_B0, mu, TOL, countMax);
+    [rECI_A,vECI_A] = UV_rv(dt, vECI_A0, rECI_A0, mu, TOL, countMax);
+    [rECI_B,vECI_B] = UV_rv(dt, vECI_B0, rECI_B0, mu, TOL, countMax);
     
     % hop maneuver
-    delta_y = waypoints(2, 2) - rECI_B(2); %should be in LVLH to match waypt
-    t_hop = norm(waypoints(2, :) - rECI_B') / norm(vECI_B); % estimate hop time
     [r_final, v_final] = hop(rECI_A, vECI_A, n, t_hop, delta_y);
 
-    t = t + dt;
+    % store hops
+    hops(i,1) = t; % s, time step
+    hops(i,2:4) = r_final';
+    hops(i,5:7) = v_final';
 
+    t = t + dt;
 end
+
 
 %% Functions
 function [rPeri,vPeri,rECI,vECI] = coes2rv(ecc,h,inc,raan,aop,theta,mu)
@@ -193,7 +194,6 @@ function [smiley, C, S, alpha] = KeplerUV(dt, v0, r0, mu, TOL, countMax)
     end
 end
 
-% Stumpff Function
 function [C, S] = stumpff(z)
     if z>0
         C = (1-cos(sqrt(z)))/z;
@@ -307,10 +307,11 @@ end
 function [r_f, v_f] = FB_orbit(t_FB,n,r0,v0,delta_y)
     % Football maneuver in CW frame
 
-    % t_FB = time for football maneuver
-    % n = mean motion
-    % y0 = initial position
-    % yf = 
+    % t_FB: time for football maneuver
+    % n: mean motion
+    % delta_y: the relative position
+    % r0: intial target position
+    % v0: initial target velocity
     
     % Required dv
     delta_vx = ((delta_y - r0(2))*n)/(2*(cos(n*t_FB) - 1));
