@@ -171,7 +171,6 @@ function [smiley, C, S, alpha] = KeplerUV(dt, v0, r0, mu, TOL, countMax)
     end
 end
 
-% Stumpff Function
 function [C, S] = stumpff(z)
     if z>0
         C = (1-cos(sqrt(z)))/z;
@@ -285,10 +284,11 @@ end
 function [r_f, v_f] = FB_orbit(t_FB,n,r0,v0,delta_y)
     % Football maneuver in CW frame
 
-    % t_FB = time for football maneuver
-    % n = mean motion
-    % y0 = initial position
-    % yf = 
+    % t_FB: time for football maneuver
+    % n: mean motion
+    % delta_y: the relative position
+    % r0: intial target position
+    % v0: initial target velocity
     
     % Required dv
     delta_vx = ((delta_y - r0(2))*n)/(2*(cos(n*t_FB) - 1));
