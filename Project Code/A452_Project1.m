@@ -53,6 +53,8 @@ n = ceil(tf/dt)+1; % number of time steps
 t = 0;             % pre-allocate time variable
 rho = zeros(n,5);  % pre-allocate matrix for time and rho
 
+hops = zeros(n,7);  % pre-allocate matrix for time and hop
+
 % Mission Target Waypoints
 waypt0 = hECI_A0;
 waypt1 = hECI_A0 - [0; 100; 0];
@@ -115,38 +117,14 @@ for i = 1:dt:n
     % hop maneuver
     [r_final, v_final] = hop(rECI_A, vECI_A, n, t_hop, delta_y);
 
+    % store hops
+    hops(i,1) = t; % s, time step
+    hops(i,2:4) = r_final';
+    hops(i,5:7) = v_final';
+
     t = t + dt;
 end
 
-% i_close = find(rho(:,5)==min(rho(:,5))); % find index where closest approach occurs
-% rho_mag_close = rho(i_close,5); % km, magnitude of closest approach
-% rho_pos_close = rho(i_close,2:4); % km, relative position of closest approach
-% time_close = rho(i_close,1)/3600; % hr, time from start of closest approach
-% 
-% figure
-% plot(rho(:,1)/3600,rho(:,5),LineWidth=1.5)
-% hold on
-% grid on
-% 
-% figure
-% plot(time_close,rho_mag_close,'*',LineWidth=1.5)
-% legend('Relative Distance','Closest Approach',Location='northeast')
-% title("Close Approach of Chaser to Target")
-% xlabel("Time (hrs)")
-% ylabel("Distance Between S/C (km)")
-% figure(2)
-% plot3(rho(:,2),rho(:,3),rho(:,4),LineWidth=1)
-% hold on
-% grid on
-% 
-% figure
-% plot3(rho_pos_close(1),rho_pos_close(2),rho_pos_close(3),'*',LineWidth=1.5)
-% legend('Chaser Relative Trajectory','Closest Approach',Location='best')
-% %'Target Location',
-% title("Chaser Relative Position")
-% xlabel("x (km)")
-% ylabel("y (km)")
-% zlabel("z (km)")
 
 %% Functions
 function [rPeri,vPeri,rECI,vECI] = coes2rv(ecc,h,inc,raan,aop,theta,mu)
