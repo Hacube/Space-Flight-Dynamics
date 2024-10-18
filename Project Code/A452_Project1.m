@@ -42,7 +42,7 @@ P_A = 2*pi*a_A^(3/2) / sqrt(mu); % s, target period
 hECI_A0 = cross(rECI_A,vECI_A); % km2/s
 
 % chaser parameters
-[~,~,rECI_B,vECI_B] = coes2rv(ecc_B,h_B,inc_B,raan_B,omega_B,theta_B,mu); % km & km/s, chaser r&v
+[~,~,rECI_B, vECI_B] = coes2rv(ecc_B,h_B,inc_B,raan_B,omega_B,theta_B,mu); % km & km/s, chaser r&v
 
 % Step forward (10 periods)
 dt = 1;            % s, time step
@@ -52,32 +52,20 @@ tf = 10*P_A;       % s, final time from start
 n = ceil(tf/dt)+1; % number of time steps
 t = 0;             % pre-allocate time variable
 rho = zeros(n,5);  % pre-allocate matrix for time and rho
-
 hops = zeros(n,7);  % pre-allocate matrix for time and hop
 
 % Mission Target Waypoints
 waypt0 = hECI_A0;
 waypt1 = hECI_A0 - [0; 100; 0];
-% waypt2
-t_hop = 2;
-t_Fb= 5;
-% [time, x, y,z];
-wayPoint = [0; waypt0;
-            10; 1; 1; 1];
-
-delta_y = 20000;
-
+t_hop = 20000;
+t_FB= 500;
+tt = zeros(n, 1);
 for i = 1:dt:n
-    
-    % if i <  wayPoint(1)
-    %     % inital position / orbit
-    % elseif  i < waypoint(2)
-    %     % first maneuver 
-    % end
 
-    hECI_A = cross(rECI_A,vECI_A); % km2/s
+    hECI_A = cross(rECI_A, vECI_A); % km2/s
     aECI_A = (-mu/norm(rECI_A)^3).*rECI_A; % km/s2
     aECI_B = (-mu/norm(rECI_B)^3).*rECI_B; % km/s2
+    hECI_B = cross(rECI_B, vECI_B); % km2/s
 
     % 5-term acceleration
     rhoECI = rECI_B - rECI_A; % km, relative positon of chaser
@@ -86,44 +74,73 @@ for i = 1:dt:n
     dOmega = -2*dot(vECI_A,rECI_A).*Omega ./ norm(rECI_A)^2; % absolute angular acceleration of moving frame
     ddrhoECI = aECI_B - aECI_A - 2.*cross(Omega,drhoECI) - cross(dOmega,rhoECI) + cross(Omega,cross(Omega,rhoECI)); % km/s2
     
-    % DCM (ECI to LVLH)
-    % ihat = rECI_A / norm(rECI_A);
-    % khat = hECI_A / norm(hECI_A);
-    % jhat = cross(khat,ihat);
-    % Q = [ihat';jhat';khat']; % direction cosine matrix
+    % Target DCM: ECI --> LVLH
     Q = ECI2LVLH_DCM(rECI_A, hECI_A); % direction cosine matrix
     
-    % rho in LVLH
-    rhoLVLH = Q*rhoECI;
-    drhoLVLH = Q*drhoECI;
-    ddrhoLVLH = Q*ddrhoECI;
+    % Target rho in LVLH
+    rhoLVLH = Q*rhoECI; %position LVLH
+    drhoLVLH = Q*drhoECI; %velocity LVLH
+    ddrhoLVLH = Q*ddrhoECI; %accel LVLH
     
     % store
     rho(i,1) = t; % s, time step
     rho(i,2:4) = rhoLVLH'; % km, relative position vector
     rho(i,5) = norm(rhoLVLH); % km, relative position magnitude
     
-    % re-allocate values
+    % % re-allocate values
     vECI_A0 = vECI_A;
-    
     rECI_A0 = rECI_A;
     vECI_B0 = vECI_B;
     rECI_B0 = rECI_B;
+
+    % % next step:
+    % % [rECI_A, vECI_A] = UV_rv(dt, vECI_A0, rECI_A0, mu, TOL, countMax); %target
+    % % [rECI_B, vECI_B] = UV_rv(dt, vECI_B0, rECI_B0, mu, TOL, countMax); %chaser
     
-    % next step:
-    [rECI_A,vECI_A] = UV_rv(dt, vECI_A0, rECI_A0, mu, TOL, countMax);
-    [rECI_B,vECI_B] = UV_rv(dt, vECI_B0, rECI_B0, mu, TOL, countMax);
+    % chaser: transform ECI-->LVLH
+    Q_B = ECI2LVLH_DCM(rECI_B, hECI_B); % direction cosine matrix
+    rLVLH_B = Q_B*rECI_B; %position chaser LVLH
+    vLVLH_B = Q_B*vECI_B; %velocity chaser LVLH
     
+    
+    delta_y = rhoLVLH(2) - 40;
+    % t_hop = norm(rhoLVLH' - [0 40 0] - rLVLH_B') / norm(vLVLH_B); % Estimate time based on current velocity
+
+
     % hop maneuver
-    [r_final, v_final] = hop(rECI_A, vECI_A, n, t_hop, delta_y);
+    % [r_final, v_final] = hop(rECI_A, vECI_A, n, t_hop, delta_y);
+      % Check if it's time for hop maneuver
+    if tt(i) >= t_hop && tt(i) < t_hop + dt
+        [r_hop, v_hop] = hop(rLVLH_B, vLVLH_B, sqrt(mu/a_A^3), 10000, delta_y);
+        rECI_B = rECI_A + Q' * r_hop;
+        vECI_B = vECI_A + Q' * v_hop;
+    end
+    % Check if it's time for football orbit
+    if tt(i) >= t_hop + t_FB && tt(i) < t_hop + t_FB + dt
+        [r_FB, v_FB] = FB_orbit(t_FB, sqrt(mu/a_A^3), rhoLVLH, drhoLVLH, 30); % 30 km football orbit
+        rECI_B = rECI_A + Q' * r_FB;
+        vECI_B = vECI_A + Q' * v_FB;
+    end
+    
+    % Propagate orbits
+    [rECI_A, vECI_A] = UV_rv(dt, vECI_A, rECI_A, mu, TOL, countMax);
+    [rECI_B, vECI_B] = UV_rv(dt, vECI_B, rECI_B, mu, TOL, countMax);
 
     % store hops
     hops(i,1) = t; % s, time step
-    hops(i,2:4) = r_final';
-    hops(i,5:7) = v_final';
-
+    hops(i,2:4) = rECI_B';
+    hops(i,5:7) = vECI_B';
     t = t + dt;
 end
+
+time_vec = linspace(0, tf, length(hops));
+figure;
+plot3(hops(:,1), hops(:,2), hops(:,3))
+grid on;
+
+figure;
+plot3(rho(:,2), rho(:,3), rho(:,4))
+grid on;
 
 
 %% Functions
