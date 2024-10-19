@@ -54,17 +54,17 @@ tf = 10*P_A;       % s, final time from start
 num = ceil(tf/dt)+1; % number of time steps
 t = 0;             % pre-allocate time variable
 rho = zeros(num,5);  % pre-allocate matrix for time and rho
-
 hops = zeros(num,7);  % pre-allocate matrix for time and hop
-rho = zeros(n,5);  % pre-allocate matrix for time and rho
-hops = zeros(n,7);  % pre-allocate matrix for time and hop
+rho = zeros(num,5);  % pre-allocate matrix for time and rho
+hops = zeros(num,7);  % pre-allocate matrix for time and hop
+delta_y = 20000; %delta_y isnt real yet
 
 % Mission Target Waypoints
 waypt0 = hECI_A0;
 waypt1 = hECI_A0 - [0; 100; 0];
 t_hop = 20000;
 t_FB= 500;
-tt = zeros(n, 1);
+tt = zeros(num, 1);
 for i = 1:dt:n
 
     hECI_A = cross(rECI_A, vECI_A); % km2/s
@@ -115,25 +115,23 @@ end
 
 for i = 1:dt:num
     % hop maneuver
-    % [r_final, v_final] = hop(rECI_A, vECI_A, n, t_hop, delta_y);
-      % Check if it's time for hop maneuver
-    if tt(i) >= t_hop && tt(i) < t_hop + dt
-        [r_hop, v_hop] = hop(rLVLH_B, vLVLH_B, sqrt(mu/a_A^3), 10000, delta_y);
-        rECI_B = rECI_A + Q' * r_hop;
-        vECI_B = vECI_A + Q' * v_hop;
-    end
-    % Check if it's time for football orbit
-    if tt(i) >= t_hop + t_FB && tt(i) < t_hop + t_FB + dt
-        [r_FB, v_FB] = FB_orbit(t_FB, sqrt(mu/a_A^3), rhoLVLH, drhoLVLH, 30); % 30 km football orbit
-        rECI_B = rECI_A + Q' * r_FB;
-        vECI_B = vECI_A + Q' * v_FB;
-    end
+    [r_final, v_final] = hop(rECI_A, vECI_A, n, t_hop, delta_y);
+    % this can stay in this for loop or be moved all into one loop above
+    % if t(i) >= t_hop && t(i) < t_hop + dt
+    %     [r_hop, v_hop] = hop(rLVLH_B, vLVLH_B, sqrt(mu/a_A^3), 10000, delta_y);
+    %     rECI_B = rECI_A + Q' * r_hop;
+    %     vECI_B = vECI_A + Q' * v_hop;
+    % end
+    % % Check if it's time for football maneuver
+    % if t(i) >= t_hop + t_FB && t(i) < t_hop + t_FB + dt
+    %     [r_FB, v_FB] = FB_orbit(t_FB, sqrt(mu/a_A^3), rhoLVLH, drhoLVLH, 30); % 30 km football orbit
+    %     rECI_B = rECI_A + Q' * r_FB;
+    %     vECI_B = vECI_A + Q' * v_FB;
+    % end
     
     % Propagate orbits
-    [rECI_A, vECI_A] = UV_rv(dt, vECI_A, rECI_A, mu, TOL, countMax);
-    [rECI_B, vECI_B] = UV_rv(dt, vECI_B, rECI_B, mu, TOL, countMax);
-
-    [r_final, v_final] = hop(rECI_A, vECI_A, n, t_hop, delta_y);
+    % [rECI_A, vECI_A] = UV_rv(dt, vECI_A, rECI_A, mu, TOL, countMax);
+    % [rECI_B, vECI_B] = UV_rv(dt, vECI_B, rECI_B, mu, TOL, countMax);
     
     % store hops
     hops(i,1) = t; % s, time step
